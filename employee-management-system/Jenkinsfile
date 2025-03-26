@@ -1,0 +1,62 @@
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_REGISTRY = 'ahmedbenhassen'
+        BACKEND_IMAGE = "${DOCKER_REGISTRY}/employee-backend"
+        FRONTEND_IMAGE = "${DOCKER_REGISTRY}/employee-frontend"
+    }
+
+    stages {
+        // Stage 1: Checkout code
+        stage('Checkout') {
+            steps {
+                git branch: 'main', 
+                url: 'https://github.com/your-username/employee-management-system.git'
+            }
+        }
+
+        // Stage 2: Build Docker images
+        stage('Build') {
+            parallel {
+                stage('Backend') {
+                    steps {
+                        dir('employemanagement') {
+                            sh 'docker build -t $BACKEND_IMAGE .'
+                        }
+                    }
+                }
+                stage('Frontend') {
+                    steps {
+                        dir('frontend') {
+                            sh 'docker build -t $FRONTEND_IMAGE .'
+                        }
+                    }
+                }
+            }
+        }
+
+        // Stage 3: Push to Docker Hub
+        stage('Push Images') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'docker-hub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh 'echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin'
+                    sh "docker push $BACKEND_IMAGE"
+                    sh "docker push $FRONTEND_IMAGE"
+                }
+            }
+        }
+
+        // Stage 4: Deploy
+        stage('Deploy') {
+            steps {
+                sh 'docker-compose down'
+                sh 'docker-compose up -d'
+            }
+        }
+    }
+}
